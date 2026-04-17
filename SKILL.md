@@ -50,15 +50,32 @@ env:
 
 默认行为：
 
-- 先从 **Hermes 的 `.env`** 中读取 `FEISHU_APP_ID`
-- 再从 **Hermes 的 `.env`** 中读取 `FEISHU_APP_SECRET`
+- 优先读取**运行中 Hermes 进程环境变量**中的 `FEISHU_APP_ID`
+- 优先读取**运行中 Hermes 进程环境变量**中的 `FEISHU_APP_SECRET`
+- 如果进程环境中没有，再读取 `~/.hermes/.env`
+- 如果 `~/.hermes/.env` 中也没有，再向用户明确报错
 
 对大多数已经配置了 **Feishu gateway** 的 Hermes 环境来说，这意味着用户通常可以**无感直接使用**，不需要再次单独输入这两个值。
 
-如果 `.env` 中不存在这两个变量，则应明确报错并提醒用户配置，例如：
+### 实现约定
 
-- `缺少 FEISHU_APP_ID：请在 ~/.hermes/.env 中配置，或先完成 Feishu gateway 配置`
-- `缺少 FEISHU_APP_SECRET：请在 ~/.hermes/.env 中配置，或先完成 Feishu gateway 配置`
+技能应按以下顺序解析凭证：
+
+1. 先检查运行中 Hermes 进程的环境变量：
+   - `FEISHU_APP_ID`
+   - `FEISHU_APP_SECRET`
+2. 若进程环境中缺失，再检查 `~/.hermes/.env`
+3. 若两处都缺失，则不要继续调用 Feishu Open API，而是直接向用户报错
+
+推荐错误提示：
+
+- `缺少 FEISHU_APP_ID`
+- `缺少 FEISHU_APP_SECRET`
+
+可扩展为更完整的提示，例如：
+
+- `缺少 FEISHU_APP_ID：请先在 Hermes 运行环境或 ~/.hermes/.env 中配置`
+- `缺少 FEISHU_APP_SECRET：请先在 Hermes 运行环境或 ~/.hermes/.env 中配置`
 
 最少需要：
 
