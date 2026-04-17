@@ -30,6 +30,20 @@ It is designed for repeatable automation such as:
 
 ## Required environment variables
 
+Default behavior:
+
+- first read `FEISHU_APP_ID` from Hermes `.env`
+- then read `FEISHU_APP_SECRET` from Hermes `.env`
+
+In practice, if the user is already running a configured **Feishu gateway** in Hermes, they can usually use this skill directly without re-entering credentials.
+
+If either variable is missing, fail clearly and tell the user how to fix it, for example:
+
+- `Missing FEISHU_APP_ID: add it to ~/.hermes/.env or configure the Hermes Feishu gateway first`
+- `Missing FEISHU_APP_SECRET: add it to ~/.hermes/.env or configure the Hermes Feishu gateway first`
+
+Minimum required variables:
+
 - `FEISHU_APP_ID`
 - `FEISHU_APP_SECRET`
 

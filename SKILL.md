@@ -14,8 +14,8 @@ metadata: {
   }
 }
 env:
-  FEISHU_APP_ID: "Feishu app id"
-  FEISHU_APP_SECRET: "Feishu app secret"
+  FEISHU_APP_ID: "Defaults to FEISHU_APP_ID in Hermes .env if present; otherwise prompt user to configure it"
+  FEISHU_APP_SECRET: "Defaults to FEISHU_APP_SECRET in Hermes .env if present; otherwise prompt user to configure it"
 ---
 
 # 📄 feishu-toolkit
@@ -48,7 +48,19 @@ env:
 
 ### 环境变量
 
-必须存在：
+默认行为：
+
+- 先从 **Hermes 的 `.env`** 中读取 `FEISHU_APP_ID`
+- 再从 **Hermes 的 `.env`** 中读取 `FEISHU_APP_SECRET`
+
+对大多数已经配置了 **Feishu gateway** 的 Hermes 环境来说，这意味着用户通常可以**无感直接使用**，不需要再次单独输入这两个值。
+
+如果 `.env` 中不存在这两个变量，则应明确报错并提醒用户配置，例如：
+
+- `缺少 FEISHU_APP_ID：请在 ~/.hermes/.env 中配置，或先完成 Feishu gateway 配置`
+- `缺少 FEISHU_APP_SECRET：请在 ~/.hermes/.env 中配置，或先完成 Feishu gateway 配置`
+
+最少需要：
 
 - `FEISHU_APP_ID`
 - `FEISHU_APP_SECRET`
