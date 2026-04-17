@@ -1,90 +1,95 @@
-# 📄 Feishu Doc Manager | 飞书文档管理器
+# 📄 feishu-toolkit（Hermes / Open API only）
 
-> **English**: Seamlessly publish Markdown content to Feishu Docs with automatic formatting. Solves key pain points: Markdown table conversion, permission management, batch writing.
+> **English**: A stable Feishu document workflow for Hermes that uses only the Open API path based on `FEISHU_APP_ID` and `FEISHU_APP_SECRET`.
 >
-> **中文**：将 Markdown 内容无缝发布到飞书文档，自动渲染格式。解决核心痛点：Markdown 表格转换、权限管理、批量写入。
+> **中文**：面向 Hermes 的飞书文档稳定工作流，只保留基于 `FEISHU_APP_ID` 和 `FEISHU_APP_SECRET` 的 Open API 路径。
 
-[![OpenClaw](https://img.shields.io/badge/OpenClaw-Skill-blue)](https://openclaw.ai)
-[![Feishu](https://img.shields.io/badge/Feishu-Integration-green)](https://open.feishu.cn)
+[![Feishu](https://img.shields.io/badge/Feishu-OpenAPI-green)](https://open.feishu.cn)
+[![Hermes](https://img.shields.io/badge/Hermes-Skill-blue)](https://github.com/NousResearch/hermes-agent)
 [![License](https://img.shields.io/badge/License-MIT-yellow)](LICENSE)
 
 ---
 
-## 🎯 Problems Solved | 解决的痛点
+## Why this branch exists
 
-Based on real-world publishing experience | 基于实际发布经验：
+This branch keeps only the **stable Open API workflow** and removes OAuth callback guidance entirely.
 
-| Pain Point | Solution | 痛点 | 解决方案 |
-|------------|----------|------|----------|
-| ❌ **Markdown tables don't render** | ✅ Auto-convert to formatted lists | Markdown 表格无法渲染 | 自动转换为格式化列表 |
-| ❌ **Permission management is complex** | ✅ One-click collaborator management | 权限管理复杂 | 一键协作者管理 |
-| ❌ **Long content causes 400 errors** | ✅ Auto-split and batch write | 长内容导致 400 错误 | 自动分段批量写入 |
-| ❌ **Formatting inconsistencies** | ✅ `write`/`append` auto-render Markdown | 格式不一致 | write/append 自动渲染 |
-| ❌ **Block updates lose formatting** | ✅ Clear API distinction | 块级更新丢失格式 | 清晰的 API 区分 |
+It is intended for environments where:
 
----
+- `FEISHU_APP_ID` and `FEISHU_APP_SECRET` are already configured
+- OAuth callback flows are brittle or unnecessary
+- you need reliable read/write automation for Feishu wiki/docx content
 
-## ✨ Features | 功能特性
+Removed on purpose:
 
-### 📝 Smart Markdown Publishing | 智能 Markdown 发布
-- **Automatic rendering** when using `write` or `append` actions
-- **Table workaround**: Tables auto-convert to formatted lists
-- **Full syntax support**: Headers, lists, bold, italic, code, quotes
+- OAuth auth-link flow
+- redirect URI setup instructions
+- localhost/public callback troubleshooting
 
-**自动渲染**使用 `write` 或 `append` 操作时
-**表格解决方案**：表格自动转换为格式化列表
-**完整语法支持**：标题、列表、粗体、斜体、代码、引用
+Kept on purpose:
 
-### 🔐 Permission Management | 权限管理
-- Add/remove collaborators with one command
-- Update permission levels (view/edit/full_access)
-- List all current permissions
-- Transfer document ownership
-
-一键添加/删除协作者
-更新权限级别（查看/编辑/完全访问）
-列出现有权限
-转移文档所有权
-
-### 📄 Document Operations | 文档操作
-- Create documents with specified folders
-- Write full Markdown content
-- Append to existing documents
-- Update/delete specific blocks
-- List document structure
-
-在指定文件夹创建文档
-写入完整 Markdown 内容
-追加到现有文档
-更新/删除指定块
-列出文档结构
+- tenant access token exchange
+- wiki token → docx token resolution
+- raw content reads
+- block-based overwrite writes
 
 ---
 
-## 🚀 Quick Start | 快速开始
+## Stable workflow
 
-### Installation | 安装
+### 1. Get tenant token
 
 ```bash
-cd ~/.openclaw/workspace/skills
-git clone https://github.com/Shuai-DaiDai/feishu-doc-manager.git
+curl -sS -X POST 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal' \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "app_id": "'$FEISHU_APP_ID'",
+    "app_secret": "'$FEISHU_APP_SECRET'"
+  }'
 ```
 
-### Configuration | 配置
+### 2. Resolve wiki token to doc token
 
-1. Go to [Feishu Open Platform](https://open.feishu.cn/app) | 访问[飞书开放平台](https://open.feishu.cn/app)
-2. Select your app → **Development Config** → **Permission Management** | 选择应用 → **开发配置** → **权限管理**
-3. Import required permissions | 导入必需权限
+```bash
+curl -sS 'https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node?token=<WIKI_TOKEN>' \
+  -H "Authorization: Bearer <TENANT_ACCESS_TOKEN>"
+```
 
-### Required Permissions | 必需权限
+Useful fields:
+
+- `data.node.obj_type`
+- `data.node.obj_token`
+- `data.node.title`
+
+### 3. Read raw content
+
+```bash
+curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_TOKEN>/raw_content' \
+  -H "Authorization: Bearer <TENANT_ACCESS_TOKEN>"
+```
+
+### 4. Overwrite a document safely
+
+The write path is:
+
+1. list document blocks
+2. patch title block
+3. delete old root children
+4. create new paragraph children in chunks
+5. read back with `raw_content`
+
+---
+
+## Required permissions
 
 ```json
 {
   "scopes": {
     "tenant": [
       "docx:document",
-      "docx:document:create", 
+      "docx:document:create",
       "docx:document:write_only",
+      "wiki:wiki",
       "docs:permission.member",
       "contact:user.base:readonly"
     ]
@@ -94,115 +99,163 @@ git clone https://github.com/Shuai-DaiDai/feishu-doc-manager.git
 
 ---
 
-## 📖 Usage Examples | 使用示例
+## Important implementation notes
 
-### 1. Create Document | 创建文档
+### Patch title block
 
-```json
-{
-  "action": "create",
-  "title": "Q1 Report | Q1 报告",
-  "folder_token": "optional_folder_token"
-}
-```
+Use:
 
-### 2. Write Markdown Content | 写入 Markdown 内容
+- `PATCH /open-apis/docx/v1/documents/<DOC_ID>/blocks/<ROOT_BLOCK_ID>`
 
-**⚠️ Critical | 关键**：Use `write` for Markdown rendering, NOT `update_block`
+Body:
 
 ```json
 {
-  "action": "write",
-  "doc_token": "UWpxdSnmXo6mPdxwOyCcWTPUndD",
-  "content": "# Project Overview | 项目概览\n\n## Key Metrics | 关键指标\n\n- **Revenue | 收入**: $100K\n- **Users | 用户**: 10K\n- **Growth | 增长**: 25%\n\n> This project exceeded expectations | 该项目超出预期"
+  "update_text": {
+    "elements": [{"text_run": {"content": "新标题"}}],
+    "style": {"align": 1},
+    "fields": [1]
+  }
 }
 ```
 
-### 3. Add Collaborator | 添加协作者
+### Delete old body blocks
 
-```bash
-curl -X POST "https://open.feishu.cn/open-apis/drive/v1/permissions/{doc_token}/members?type=docx" \
-  -H "Authorization: Bearer {token}" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "member_type": "openid",
-    "member_id": "ou_xxx",
-    "perm": "edit"
-  }'
+Use:
+
+- `DELETE /open-apis/docx/v1/documents/<DOC_ID>/blocks/<ROOT_BLOCK_ID>/children/batch_delete`
+
+Body:
+
+```json
+{
+  "start_index": 0,
+  "end_index": <child_count>
+}
+```
+
+**Important:** `end_index` behaves as an exclusive bound in practice.
+If there is 1 child, deleting it requires `end_index: 1`.
+
+### Recreate body blocks
+
+Use:
+
+- `POST /open-apis/docx/v1/documents/<DOC_ID>/blocks/<ROOT_BLOCK_ID>/children`
+
+Body:
+
+```json
+{
+  "index": 0,
+  "children": [
+    {
+      "block_type": 2,
+      "text": {
+        "elements": [
+          {"text_run": {"content": "第一行"}}
+        ]
+      }
+    }
+  ]
+}
+```
+
+Recommended:
+
+- one paragraph per line
+- chunk writes at ~50 lines per request
+- verify with `raw_content`
+
+---
+
+## Minimal Python example
+
+```python
+import os, json, ssl, uuid, urllib.request, urllib.error
+
+APP_ID = os.environ['FEISHU_APP_ID']
+APP_SECRET = os.environ['FEISHU_APP_SECRET']
+
+
+def req(method, url, data=None, headers=None):
+    body = None if data is None else json.dumps(data, ensure_ascii=False).encode('utf-8')
+    request = urllib.request.Request(url, data=body, method=method)
+    final_headers = {'Content-Type': 'application/json; charset=utf-8'}
+    if headers:
+        final_headers.update(headers)
+    for k, v in final_headers.items():
+        request.add_header(k, v)
+    try:
+        with urllib.request.urlopen(request, context=ssl.create_default_context()) as r:
+            return r.status, json.loads(r.read().decode('utf-8'))
+    except urllib.error.HTTPError as e:
+        payload = e.read().decode('utf-8', errors='ignore')
+        try:
+            return e.code, json.loads(payload)
+        except Exception:
+            return e.code, {'raw': payload}
+
+
+_, token_resp = req('POST', 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal', {
+    'app_id': APP_ID,
+    'app_secret': APP_SECRET,
+})
+headers = {'Authorization': f"Bearer {token_resp['tenant_access_token']}"}
+
+wiki_token = 'LDx2wLgkwiEEmjknHOoctC8jnff'
+_, node = req('GET', f'https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node?token={wiki_token}', headers=headers)
+doc_id = node['data']['node']['obj_token']
+
+_, blocks = req('GET', f'https://open.feishu.cn/open-apis/docx/v1/documents/{doc_id}/blocks?page_size=500', headers=headers)
+root = blocks['data']['items'][0]
+root_id = root['block_id']
+child_count = len(root.get('children', []))
+
+req('PATCH', f'https://open.feishu.cn/open-apis/docx/v1/documents/{doc_id}/blocks/{root_id}', {
+    'update_text': {
+        'elements': [{'text_run': {'content': '新标题'}}],
+        'style': {'align': 1},
+        'fields': [1]
+    }
+}, headers)
+
+if child_count:
+    req('DELETE', f'https://open.feishu.cn/open-apis/docx/v1/documents/{doc_id}/blocks/{root_id}/children/batch_delete', {
+        'start_index': 0,
+        'end_index': child_count
+    }, headers)
+
+lines = ['第一行', '第二行', '第三行']
+for i in range(0, len(lines), 50):
+    chunk = lines[i:i+50]
+    children = [
+        {'block_type': 2, 'text': {'elements': [{'text_run': {'content': line}}]}}
+        for line in chunk
+    ]
+    req('POST', f'https://open.feishu.cn/open-apis/docx/v1/documents/{doc_id}/blocks/{root_id}/children?index={i}&client_token={uuid.uuid4()}', {
+        'index': i,
+        'children': children,
+    }, headers)
+
+_, raw = req('GET', f'https://open.feishu.cn/open-apis/docx/v1/documents/{doc_id}/raw_content', headers=headers)
+print(raw['data']['content'])
 ```
 
 ---
 
-## 📋 Markdown Support | Markdown 支持
+## Repository layout
 
-### ✅ Supported | 支持
-
-| Markdown | Result | Markdown | 效果 |
-|----------|--------|----------|------|
-| `# Title` | Heading 1 | `# 标题` | 标题1 |
-| `## Title` | Heading 2 | `## 标题` | 标题2 |
-| `- Item` | Bullet list | `- 项目` | 无序列表 |
-| `**bold**` | **Bold** | `**粗体**` | **粗体** |
-| `> quote` | Blockquote | `> 引用` | 引用块 |
-
-### ❌ Not Supported | 不支持
-
-- **Tables**: Auto-converted to lists | 表格：自动转换为列表
-- **Images**: Use separate API | 图片：使用单独 API
-- **Complex HTML**: Use Markdown | 复杂 HTML：使用 Markdown
-
----
-
-## 🔧 Key Insight | 核心发现
-
-### `write`/`append` vs `update_block`
-
-| Feature | `write`/`append` | `update_block` |
-|---------|------------------|----------------|
-| Markdown Rendering | ✅ **Yes** | ❌ No (plain text) |
-| Use Case | Initial content, appending | Quick text patches |
-| 功能 | 初始内容、追加 | 快速文本修补 |
-| Markdown 渲染 | ✅ **支持** | ❌ 不支持（纯文本） |
-
-**💡 Best Practice**: Always use `write` or `append` for Markdown content to get full formatting.
-**💡 最佳实践**：Markdown 内容始终使用 `write` 或 `append` 以获得完整格式。
-
----
-
-## 🐛 Troubleshooting | 故障排除
-
-### Problem: 400 Bad Request | 400 错误
-**Cause**: Content too long | 原因：内容过长  
-**Solution**: Split into smaller chunks | 解决：分段写入
-
-### Problem: Markdown not rendering | Markdown 不渲染
-**Cause**: Used `update_block` instead of `write` | 原因：使用了 `update_block`  
-**Solution**: Use `write` or `append` | 解决：使用 `write` 或 `append`
-
-### Problem: Permission denied | 权限错误
-**Cause**: Missing `docs:permission.member` | 原因：缺少权限  
-**Solution**: Add in Feishu console | 解决：在飞书控制台添加
-
----
-
-## 📄 Document Structure | 文档结构
-
-```
+```text
 feishu-doc-manager/
-├── SKILL.md          # Skill definition | 技能定义
-├── README.md         # Documentation | 文档
-├── LICENSE           # MIT License | MIT 许可证
-├── install.sh        # Setup script | 安装脚本
-└── docs/             # Additional docs | 补充文档
-    └── images/       # Screenshots | 截图
+├── SKILL.md
+├── README.md
+├── LICENSE
+└── install.sh
 ```
 
 ---
 
-## 🤝 Contributing | 贡献
+## License
 
-Issues and PRs welcome! | 欢迎提交 Issue 和 PR！
-
-## 📜 License | 许可证
-
-MIT © Shuai-DaiDai
+MIT
