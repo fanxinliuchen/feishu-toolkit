@@ -173,6 +173,61 @@ curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_TOKEN>/raw_con
 
 ---
 
+## 创建文档
+
+### 创建空白 docx 文档
+
+接口：
+
+- `POST /open-apis/docx/v1/documents`
+
+最小请求体：
+
+```json
+{
+  "title": "新文档标题"
+}
+```
+
+如果需要创建到指定文件夹，可传：
+
+```json
+{
+  "title": "新文档标题",
+  "folder_token": "<FOLDER_TOKEN>"
+}
+```
+
+返回中重点关注：
+
+- `data.document.document_id`
+- `data.document.revision_id`
+- `data.document.title`
+
+其中：
+- `document_id` 就是后续 block 读写和 `raw_content` 读取使用的 doc token
+- 创建成功后，建议立刻进入“覆盖式写入文档”流程，补上正文内容
+
+### 创建后推荐动作
+
+1. 记录 `document_id`
+2. 若需要，立即 PATCH 根标题 block
+3. 用 block API 创建正文 children
+4. 最后用 `raw_content` 回读校验
+
+### cURL 示例
+
+```bash
+curl -sS -X POST 'https://open.feishu.cn/open-apis/docx/v1/documents' \
+  -H 'Content-Type: application/json' \
+  -H "Authorization: Bearer <TENANT_ACCESS_TOKEN>" \
+  -d '{
+    "title": "新文档标题"
+  }'
+```
+
+---
+
 ## 覆盖式写入文档
 
 ### 总原则

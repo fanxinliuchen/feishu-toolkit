@@ -101,7 +101,42 @@ curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_TOKEN>/raw_con
   -H "Authorization: Bearer <TENANT_ACCESS_TOKEN>"
 ```
 
-### 4. Overwrite a document
+### 4. Create a document
+
+Use:
+
+- `POST /open-apis/docx/v1/documents`
+
+Minimum body:
+
+```json
+{
+  "title": "New document"
+}
+```
+
+Optional folder target:
+
+```json
+{
+  "title": "New document",
+  "folder_token": "<FOLDER_TOKEN>"
+}
+```
+
+Important response fields:
+
+- `data.document.document_id`
+- `data.document.revision_id`
+- `data.document.title`
+
+After creation, the recommended sequence is:
+
+1. keep the returned `document_id`
+2. add body content through block APIs
+3. verify with `raw_content`
+
+### 5. Overwrite a document
 
 Recommended write sequence:
 
