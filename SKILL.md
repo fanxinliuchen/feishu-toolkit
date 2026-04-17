@@ -1,18 +1,16 @@
 ---
 name: feishu-toolkit
 description: |
-  飞书 Open API 稳定文档工具链（Hermes 版）。
+  飞书文档稳定工具链（Hermes 版）。
 
-  仅保留基于 FEISHU_APP_ID + FEISHU_APP_SECRET 的稳定 Open API 路径：
+  仅保留基于 FEISHU_APP_ID + FEISHU_APP_SECRET 的 Open API 路径：
   获取 tenant_access_token、解析 wiki token、读取 docx raw_content、
   以及基于 block API 的覆盖式写入。
-
-  不包含 OAuth 回调流程，不依赖 localhost/public redirect URI 配置。
-homepage: https://github.com/fanxinliuchen/feishu-doc-manager
+homepage: https://github.com/fanxinliuchen/feishu-toolkit
 metadata: {
   "hermes": {
     "emoji": "📄",
-    "tags": ["feishu", "lark", "open-api", "docx", "wiki"]
+    "tags": ["feishu", "lark", "open-api", "docx", "wiki", "productivity"]
   }
 }
 env:
@@ -20,29 +18,29 @@ env:
   FEISHU_APP_SECRET: "Feishu app secret"
 ---
 
-# 📄 feishu-toolkit（Hermes / Open API only）
+# 📄 feishu-toolkit
 
-这个技能只保留一条稳定路径：
+这是一个面向 Hermes 的飞书文档技能，定位是：
 
-1. 用 `FEISHU_APP_ID` + `FEISHU_APP_SECRET` 换取 `tenant_access_token`
-2. 如输入是 wiki 链接/token，先解析为真实 `docx` 文档 token
-3. 读取时使用 `raw_content`
-4. 写入时使用 `docx block API`：
-   - 列 blocks
-   - PATCH 标题
-   - DELETE 旧 children
-   - POST 新 children
+- **只走稳定的 Open API 路径**
+- **不依赖额外授权跳转**
+- **适合自动化读写 wiki / docx**
 
-**不再使用 OAuth 授权链接 / 回调。**
+保留的能力：
+
+1. 用 `FEISHU_APP_ID` + `FEISHU_APP_SECRET` 获取 `tenant_access_token`
+2. 将 wiki token 解析为真实 `docx` 文档 token
+3. 读取文档 `raw_content`
+4. 用 block API 覆盖写入文档
 
 ---
 
 ## 适用场景
 
-- 读取飞书 wiki / docx 文档内容
-- 用脚本稳定覆盖一个飞书文档
-- 自动生成日报、技能索引、知识库同步页
-- 需要绕过 OAuth callback / redirect URI 问题
+- 读取飞书 wiki / docx 内容
+- 将结构化文本同步到飞书文档
+- 自动生成日报、周报、技能索引、知识库目录页
+- 需要稳定、可脚本化、可回读校验的飞书文档流程
 
 ---
 
@@ -50,7 +48,7 @@ env:
 
 ### 环境变量
 
-必须提供：
+必须存在：
 
 - `FEISHU_APP_ID`
 - `FEISHU_APP_SECRET`
@@ -73,16 +71,16 @@ env:
 ```
 
 说明：
-- 读文档至少需要 `docx:document`
+- 读取文档至少需要 `docx:document`
 - 创建文档需要 `docx:document:create`
 - 覆盖写入需要 `docx:document:write_only`
-- 解析 wiki 节点建议有 `wiki:wiki`
+- wiki 节点解析建议启用 `wiki:wiki`
 
 ---
 
-## 核心工作流
+## 核心流程
 
-### 1) 获取 tenant token
+### 1）获取 tenant token
 
 ```bash
 curl -sS -X POST 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal' \
@@ -93,19 +91,19 @@ curl -sS -X POST 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/i
   }'
 ```
 
-成功后从返回 JSON 中取：
+成功后读取：
 
 - `tenant_access_token`
 
 ---
 
-### 2) 解析 wiki token 到真实 docx token
+### 2）解析 wiki token
 
-如果用户给的是链接，例如：
+如果用户给的是 wiki 链接，例如：
 
 - `https://my.feishu.cn/wiki/LDx2wLgkwiEEmjknHOoctC8jnff`
 
-其中 wiki token 是：
+其中 token 为：
 
 - `LDx2wLgkwiEEmjknHOoctC8jnff`
 
@@ -116,40 +114,49 @@ curl -sS 'https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node?token=<WIKI_T
   -H "Authorization: Bearer <TENANT_ACCESS_TOKEN>"
 ```
 
-重点字段：
+关注字段：
 
-- `data.node.obj_type` → 通常是 `docx`
-- `data.node.obj_token` → 真实文档 token
-- `data.node.title` → 标题
+- `data.node.obj_type`
+- `data.node.obj_token`
+- `data.node.title`
+
+其中：
+- `obj_type=docx` 表示真实对象是文档
+- `obj_token` 就是后续读取 / 写入要用的文档 token
 
 ---
 
-### 3) 读取文档 raw content
+### 3）读取文档 raw content
 
 ```bash
 curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_TOKEN>/raw_content' \
   -H "Authorization: Bearer <TENANT_ACCESS_TOKEN>"
 ```
 
-返回字段：
+返回中的关键字段：
 
 - `data.content`
 
 适合作为：
 - 快速读取
-- 回读校验
-- 覆盖写入后的验证
+- 结果展示
+- 写入后的回读校验
 
 ---
 
-## 稳定写入路径（覆盖式）
+## 覆盖式写入文档
 
 ### 总原则
 
-不要依赖 OAuth helper，也不要依赖 callback。
-直接使用 docx block API 做覆盖写入。
+文档写入统一走 block API：
 
-### Step A. 列出 blocks
+1. 列出现有 blocks
+2. 更新标题 block
+3. 删除旧正文 children
+4. 分批创建新的 paragraph children
+5. 再次读取 `raw_content` 校验
+
+### A. 列出 blocks
 
 ```bash
 curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_ID>/blocks?page_size=500' \
@@ -159,9 +166,15 @@ curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_ID>/blocks?pag
 关键点：
 - 第一项通常是根 page block
 - 根 block 的 `block_id` 通常等于文档 id
-- 根 block 的 `children` 数组是正文块列表
+- 根 block 的 `children` 是正文块列表
 
-### Step B. PATCH 标题
+### B. 更新标题 block
+
+接口：
+
+- `PATCH /open-apis/docx/v1/documents/<DOC_ID>/blocks/<ROOT_BLOCK_ID>`
+
+请求体：
 
 ```json
 {
@@ -175,15 +188,12 @@ curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_ID>/blocks?pag
 }
 ```
 
-接口：
+实测要点：
+- 更新标题时不能只传 `elements`
+- 还需要传 `style`
+- 还需要传 `fields: [1]`
 
-- `PATCH /open-apis/docx/v1/documents/<DOC_ID>/blocks/<ROOT_BLOCK_ID>`
-
-已验证：
-- `fields: [1]` 可用于更新标题文本
-- 只传 `elements` 不够，必须同时传 `style` 和 `fields`
-
-### Step C. 删除旧正文 children
+### C. 删除旧正文 children
 
 接口：
 
@@ -198,12 +208,11 @@ curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_ID>/blocks?pag
 }
 ```
 
-注意：
-- `end_index` 实际表现为**排他上界**
-- 如果有 1 个 child，要删干净，需要传 `end_index: 1`
-- 不是 `child_count - 1`
+实测要点：
+- `end_index` 应按**排他上界**理解
+- 如果有 1 个 child，要删干净，应传 `end_index: 1`
 
-### Step D. 重建正文 children
+### D. 创建新正文 children
 
 接口：
 
@@ -228,12 +237,12 @@ curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_ID>/blocks?pag
 ```
 
 说明：
-- `block_type: 2` 为普通段落块
-- 每一行内容写成一个 paragraph block，最稳定
-- 大文档分批写入，建议每批 50 行左右
-- 可附带 `client_token` 做幂等控制
+- `block_type: 2` 是普通段落块
+- 每一行内容写成一个 paragraph block 最稳定
+- 大文档建议按 50 行左右分批写入
+- 可附加 `client_token` 做幂等控制
 
-### Step E. 回读验证
+### E. 回读校验
 
 再次调用：
 
@@ -241,8 +250,8 @@ curl -sS 'https://open.feishu.cn/open-apis/docx/v1/documents/<DOC_ID>/blocks?pag
 
 确认：
 - 标题正确
-- 正文内容完整
-- 分批写入没有漏行
+- 正文完整
+- 没有漏行或重复
 
 ---
 
@@ -278,8 +287,7 @@ _, token_resp = req('POST', 'https://open.feishu.cn/open-apis/auth/v3/tenant_acc
     'app_id': APP_ID,
     'app_secret': APP_SECRET,
 })
-token = token_resp['tenant_access_token']
-headers = {'Authorization': f'Bearer {token}'}
+headers = {'Authorization': f"Bearer {token_resp['tenant_access_token']}"}
 
 wiki_token = 'LDx2wLgkwiEEmjknHOoctC8jnff'
 _, node = req('GET', f'https://open.feishu.cn/open-apis/wiki/v2/spaces/get_node?token={wiki_token}', headers=headers)
@@ -324,44 +332,24 @@ print(raw['data']['content'])
 
 ## 最佳实践
 
-- 读取：优先 `raw_content`
-- wiki 链接：先解析，再读 docx
-- 覆盖写入：始终按 block 流程做，不要混用不稳定 helper
-- 大文档：分块写入，每批 50 行左右
-- 写后：必须 `raw_content` 回读校验
-- 自动化任务：把标题 patch、旧正文删除、新正文分块写入做成固定模板
+- 读取优先用 `raw_content`
+- wiki 链接先解析 token，再读取 docx
+- 写入固定走 block 流程
+- 大文档分批写入
+- 写后必须回读校验
+- 自动化任务建议把“标题更新 + 正文清空 + 正文重建 + 回读验证”做成固定模板
 
 ---
 
-## 已知坑
+## 触发词
 
-1. **不要走 OAuth callback 路径**
-   - 容易踩 `redirect_uri mismatch`
-   - 特别是在 localhost / 公网 IP 混用时
-
-2. **删除 children 时 `end_index` 不是最后一个下标**
-   - 实测应传 child 数量
-   - 即 `[start_index, end_index)` 语义
-
-3. **更新标题不能只传 elements**
-   - 还要传 `style`
-   - 还要传 `fields: [1]`
-
-4. **长内容不要一次写太大**
-   - 建议拆成 paragraph blocks 批量写入
-
----
-
-## 简明触发词
-
-当用户提到以下内容时，优先使用本技能的 Open API 稳定路径：
+用户提到以下内容时，优先使用本技能：
 
 - “读取飞书文档”
 - “读取飞书 wiki”
-- “把内容写入飞书文档”
+- “把内容写进飞书文档”
 - “同步到飞书”
-- “飞书文档 OAuth 有问题”
-- “redirect_uri 不匹配”
+- “飞书文档自动化”
 
 ---
 

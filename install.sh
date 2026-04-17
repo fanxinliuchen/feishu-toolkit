@@ -1,8 +1,8 @@
 #!/bin/bash
 #
-# feishu-toolkit (Hermes / Open API only) install script
+# feishu-toolkit install script for Hermes
 # Usage:
-#   curl -sSL https://raw.githubusercontent.com/fanxinliuchen/feishu-doc-manager/hermes/install.sh | bash
+#   curl -sSL https://raw.githubusercontent.com/fanxinliuchen/feishu-toolkit/main/install.sh | bash
 #
 
 set -e
@@ -18,7 +18,7 @@ success() { echo -e "${GREEN}✅ $1${NC}"; }
 warning() { echo -e "${YELLOW}⚠️  $1${NC}"; }
 error() { echo -e "${RED}❌ $1${NC}"; }
 
-detect_workspace() {
+detect_hermes_home() {
     if [ -n "$HERMES_HOME" ] && [ -d "$HERMES_HOME" ]; then
         echo "$HERMES_HOME"
     elif [ -d "$HOME/.hermes" ]; then
@@ -32,11 +32,11 @@ detect_workspace() {
 
 main() {
     echo ""
-    echo "📄 feishu-toolkit (Hermes / Open API only)"
-    echo "========================================="
+    echo "📄 feishu-toolkit"
+    echo "================="
     echo ""
 
-    HERMES_DIR=$(detect_workspace)
+    HERMES_DIR=$(detect_hermes_home)
     if [ -z "$HERMES_DIR" ]; then
         error "未找到 Hermes 目录"
         echo "请先确保 ~/.hermes 已存在，或设置 HERMES_HOME。"
@@ -51,14 +51,12 @@ main() {
     if [ -d "$SKILL_DIR/feishu-toolkit" ]; then
         warning "feishu-toolkit 已存在，执行更新..."
         cd "$SKILL_DIR/feishu-toolkit"
-        git fetch origin
-        git checkout hermes || git checkout -b hermes
-        git pull origin hermes || true
-        success "已更新到最新 hermes 分支"
+        git pull origin main
+        success "已更新到最新 main 分支"
     else
         info "正在安装 feishu-toolkit..."
         cd "$SKILL_DIR"
-        git clone -b hermes https://github.com/fanxinliuchen/feishu-doc-manager.git feishu-toolkit
+        git clone https://github.com/fanxinliuchen/feishu-toolkit.git
         success "安装完成"
     fi
 
